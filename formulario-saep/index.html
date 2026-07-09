@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listas de Verificação SAEP</title>
+<style>
+  :root {
+    --azul-senai: #0057a8;
+    --azul-escuro: #003d75;
+    --azul-claro: #eaf2fb;
+    --cinza-borda: #d6dee6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+    background: #f2f5f8;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .topbar {
+    background: var(--azul-escuro);
+    color: #fff;
+    padding: 14px 20px;
+  }
+  .logo {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .logo span {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    color: #bcd6f2;
+  }
+  .abas {
+    display: flex;
+    gap: 4px;
+    background: #fff;
+    border-bottom: 2px solid var(--cinza-borda);
+    padding: 0 16px;
+  }
+  .aba {
+    border: none;
+    background: transparent;
+    padding: 14px 22px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #667;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .aba:hover {
+    color: var(--azul-senai);
+  }
+  .aba.ativa {
+    color: var(--azul-senai);
+    border-bottom-color: var(--azul-senai);
+  }
+  .conteudo {
+    flex: 1;
+    position: relative;
+  }
+  .conteudo iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: none;
+  }
+  .conteudo iframe.ativa {
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="logo">SENAI<span>PELO FUTURO DO TRABALHO — Listas de Verificação SAEP</span></div>
+  </header>
+
+  <nav class="abas">
+    <button type="button" class="aba ativa" data-alvo="frameSaep01">SAEP01 — Lista de Verificação</button>
+    <button type="button" class="aba" data-alvo="frameSaep02">SAEP02 — Lista de Verificação por Atividade</button>
+  </nav>
+
+  <div class="conteudo">
+    <iframe id="frameSaep01" class="ativa" src="saep01/index.html" title="SAEP01"></iframe>
+    <iframe id="frameSaep02" src="saep02/index.html" title="SAEP02"></iframe>
+  </div>
+</div>
+
+<script>
+  const abas = document.querySelectorAll(".aba");
+  const iframes = document.querySelectorAll(".conteudo iframe");
+
+  abas.forEach(aba => {
+    aba.addEventListener("click", () => {
+      abas.forEach(a => a.classList.remove("ativa"));
+      iframes.forEach(f => f.classList.remove("ativa"));
+      aba.classList.add("ativa");
+      document.getElementById(aba.dataset.alvo).classList.add("ativa");
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lista de Verificação por Atividade - SAEP02</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page">
+
+  <header class="topbar">
+    <div class="logo">SENAI<span>PELO FUTURO DO TRABALHO</span></div>
+  </header>
+
+  <h1 class="titulo-principal">Lista de Verificação por Atividade</h1>
+
+  <section class="card">
+    <h2>Aluno</h2>
+    <div class="grid-2">
+      <div class="campo">
+        <label for="alunoSelect">Selecione o aluno</label>
+        <select id="alunoSelect"></select>
+      </div>
+      <div class="campo">
+        <label for="alunoCpf">CPF</label>
+        <input type="text" id="alunoCpf" readonly placeholder="Selecione um aluno...">
+      </div>
+    </div>
+
+    <details class="novo-aluno">
+      <summary>+ Adicionar novo aluno</summary>
+      <div class="grid-2">
+        <div class="campo">
+          <label for="novoAlunoNome">Nome do aluno</label>
+          <input type="text" id="novoAlunoNome" placeholder="Ex: Maria da Silva">
+        </div>
+        <div class="campo">
+          <label for="novoAlunoCpf">CPF</label>
+          <input type="text" id="novoAlunoCpf" placeholder="000.000.000-00">
+        </div>
+      </div>
+      <div class="acoes-inline">
+        <button type="button" id="btnAddAluno" class="btn btn-secundario">Adicionar à lista</button>
+        <button type="button" id="btnRemoveAluno" class="btn btn-perigo">Remover aluno selecionado</button>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Dados da Avaliação</h2>
+    <div class="grid-2">
+      <div class="campo">
+        <label for="avaliador">Avaliador</label>
+        <input type="text" id="avaliador" placeholder="Nome do avaliador">
+      </div>
+      <div class="campo">
+        <label for="curso">Curso</label>
+        <input type="text" id="curso" value="TÉCNICO EM DESENVOLVIMENTO DE SISTEMAS">
+      </div>
+      <div class="campo">
+        <label for="dataAvaliacao">Data</label>
+        <input type="date" id="dataAvaliacao">
+      </div>
+      <div class="campo">
+        <label for="horaAvaliacao">Hora</label>
+        <input type="time" id="horaAvaliacao" step="1">
+      </div>
+      <div class="campo">
+        <label for="edicao">Edição</label>
+        <input type="text" id="edicao" value="2021">
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Competência Geral</h2>
+    <p class="competencia-texto">
+      Desenvolver e programar sistemas computacionais, atendendo normas e padrão de qualidade,
+      usabilidade, integridade e segurança da informação.
+    </p>
+  </section>
+
+  <div id="checklistContainer"></div>
+
+  <div class="barra-acoes">
+    <button type="button" id="btnSalvar" class="btn btn-primario">Salvar avaliação</button>
+    <button type="button" id="btnLimpar" class="btn btn-secundario">Limpar respostas do aluno</button>
+    <button type="button" id="btnImprimir" class="btn btn-secundario">Imprimir / Exportar PDF</button>
+    <span id="statusSalvo" class="status-salvo"></span>
+  </div>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
