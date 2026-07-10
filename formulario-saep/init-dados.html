@@ -437,17 +437,17 @@ const ALUNOS = [
     nome: "Kauã Batista Neves",
     cpf: "000.000.019-19",
     a: [
-      ["S6","Não submeteu nenhum arquivo. Pasta completamente vazia."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."]
+      ["S6","Nenhum script SQL submetido. Backend usa spring.jpa.hibernate.ddl-auto=update para criação automática das tabelas, sem DDL/DML explícito."],
+      ["S6","View vw_estoque não criada. Nenhum arquivo SQL presente no projeto."],
+      ["S6","Diagrama ER não submetido. Nenhum arquivo .brM3, PNG ou equivalente encontrado."],
+      ["S6","Nenhum endpoint ou função para listar valor total por categoria implementado."],
+      [2,"GET /produtos retorna findAll(). Entidade Produto sem campo unidade_medida; listagem incompleta com menos de 6 campos obrigatórios."],
+      [2,"POST /produtos salva produto sem nenhuma validação de campos obrigatórios, faixas de valor ou duplicidade."],
+      ["S6","GET /movimentacoes retorna findAll() sem filtrar por tipo SAIDA e sem ordenação por data."],
+      [2,"POST /movimentacoes atualiza saldo (ENTRADA/SAIDA) corretamente, mas define data como LocalDateTime.now() sem receber data do usuário e sem formato DD-MM-YYYY."],
+      ["S6","Nenhuma função de relatório de movimentações por período implementada."],
+      ["S6","Nenhuma função de produto com maior volume de saída implementada."],
+      ["S6","Entidade Produto sem campos limite_min/limite_max; nenhuma função de alerta de estoque implementada."]
     ]
   },
   {
@@ -471,17 +471,17 @@ const ALUNOS = [
     nome: "Levi Ferreira de Melo",
     cpf: "000.000.021-21",
     a: [
-      ["S6","Não submeteu nenhum arquivo. Pasta completamente vazia."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."],
-      ["S6","Não submeteu nenhum arquivo."]
+      [4,"Script SQL completo com 3 tabelas (categorias, produtos, movimentacoes), constraints FK e CHECK, dados inseridos via INSERT. Estrutura correta e funcional."],
+      [4,"View vw_estoque com 7 colunas: id_produto, nome_produto, categoria, unidade_medida, quantidade, valor_unitario e valor_total calculado (quantidade * valor_unitario). Supera o mínimo de 5 colunas."],
+      [4,"DER exportado em PNG (Conceitual e Lógico) com entidades Categoria, Produto e Movimentações, atributos e cardinalidades corretas."],
+      [4,"GET /categorias/valor-total implementado com SUM(quantidade * valor_unitario) agrupado por categoria, ordenado por nome. Correto e completo."],
+      [4,"GET /produtos retorna 6 campos via JOIN: id, nome, unidade_medida, valor_unitario, quantidade e categoria. Consulta correta e completa."],
+      [4,"POST /produtos com validação completa: campos obrigatórios, valor_unitario >= 0, quantidade entre 0 e 100 e verificação de categoria existente no banco."],
+      [3,"GET /movimentacoes/saidas filtra por SAIDA e ordena por data_movimentacao DESC corretamente. Data retornada no formato ISO (YYYY-MM-DD) em vez de DD-MM-YYYY."],
+      [3,"POST /movimentacoes/entrada com transação, validações e atualização de saldo correta. Data recebida e armazenada como DATE sem conversão para o formato DD-MM-YYYY no output."],
+      [4,"GET /relatorio/periodo retorna os 7 campos obrigatórios: nome_produto, unidade_medida, total_entradas, total_saidas, saldo_no_periodo, valor_total_financeiro_entradas e valor_total_financeiro_saidas."],
+      [4,"GET /relatorio/maiores-saidas retorna os 3 campos obrigatórios: nome_produto, quantidade_total_saida e valor_total_financeiro_saida, ordenados por quantidade DESC."],
+      [3,"GET /produtos/alertas-limite identifica corretamente produtos no mínimo (0) e máximo (100) com percentual. Porém limite_min e limite_max não são retornados como campos distintos no resultado."]
     ]
   },
   {

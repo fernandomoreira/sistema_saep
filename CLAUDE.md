@@ -184,9 +184,9 @@ Os itens S6 ("O aluno optou pela não realização") e S7 ("O tempo finalizou an
 | 16 | João Victor Souza Alves dos Santos | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 |
 | 17 | João Vitor Pereira Da Rocha | 4 | 3 | S6 | 3 | 3 | 4 | 3 | 3 | 4 | 4 | 2 |
 | 18 | Juliana Costa Silva | 2 | 4 | S6 | S6 | 3 | 2 | 1 | 3 | S6 | S6 | S6 |
-| 19 | Kauã Batista Neves | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 |
+| 19 | Kauã Batista Neves | S6 | S6 | S6 | S6 | 2 | 2 | S6 | 2 | S6 | S6 | S6 |
 | 20 | Kauan Gabriel Souza Dias dos Santos | 4 | 4 | S6 | 4 | 4 | 4 | 3 | 3 | 4 | 4 | 4 |
-| 21 | Levi Ferreira de Melo | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 |
+| 21 | Levi Ferreira de Melo | 4 | 4 | 4 | 4 | 4 | 4 | 3 | 3 | 4 | 4 | 3 |
 | 22 | Luis Felipe da Silva Paixão | 3 | S6 | S6 | 4 | 3 | 4 | 3 | 3 | 1 | 3 | 3 |
 | 23 | Marcos Paulo Oliveira Silva | 4 | 3 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 |
 | 24 | Mário Augusto Mutti Hohenfeld | S6 | S6 | 2 | S6 | S6 | S6 | S6 | S6 | S6 | S6 | S6 |
@@ -210,8 +210,6 @@ Anderson tem CPF real (`086.320.535-66`). Os demais usam CPFs fictícios sequenc
 ### Alunos que não submeteram nada
 - **Gabriel Almeida Lima Macedo** — pasta vazia
 - **João Victor Souza Alves dos Santos** — pasta vazia
-- **Kauã Batista Neves** — pasta vazia
-- **Levi Ferreira de Melo** — pasta vazia
 
 ### Problemas de extração de arquivos
 - **Marcos Paulo Oliveira Silva** — ZIP do backend corrompido (path too long no Windows). Apenas `script.sql` avaliado.
@@ -219,7 +217,8 @@ Anderson tem CPF real (`086.320.535-66`). Os demais usam CPFs fictícios sequenc
 
 ### Tecnologias utilizadas pelos alunos
 - **Python + SQLite/MySQL (console):** Anderson, Davi, Filipe, Gabriel Santiago, Kauan, Luis Felipe, Vener
-- **Java Spring Boot (REST API):** Cauã Costa, Cauã Santos, David, Gabriel Araújo, Gabriel Santos, Isaac Newton, João Vitor, Juliana, Marcos, Miguel, Pablo, Samara
+- **Java Spring Boot (REST API):** Cauã Costa, Cauã Santos, David, Gabriel Araújo, Gabriel Santos, Isaac Newton, João Vitor, Juliana, Kauã, Marcos, Miguel, Pablo, Samara
+- **Node.js + Express + MySQL:** Levi
 - **Java console (in-memory):** Isaac Newton (Swing/NetBeans templates), Luis Felipe
 - **Apenas SQL (sem backend):** Eric, Isaac Salomão, Ítalo
 - **Apenas DER + planilha:** Mário Augusto
@@ -227,8 +226,14 @@ Anderson tem CPF real (`086.320.535-66`). Os demais usam CPFs fictícios sequenc
 ### Arquivos `.brM3`
 Arquivos do software **brModelo** — formato binário, não legível como texto. Quando presentes sem imagem exportada (PNG), o DER foi inferido pela estrutura SQL. Ítalo Brito submeteu PNGs legíveis do DER e recebeu nível 4 em A03.
 
+### Kauã Batista Neves — Java Spring Boot com projeto real
+Submeteu projeto Spring Boot funcional, mas incompleto. Entidade `Produto` sem campos `unidade_medida`, `limite_min`, `limite_max`. Sem script SQL (usa `ddl-auto=update`). Sem view, sem DER. `GET /movimentacoes` retorna tudo sem filtro. `POST /movimentacoes` atualiza saldo mas data = `LocalDateTime.now()` (sem input do usuário).
+
+### Levi Ferreira de Melo — Node.js com implementação quase completa
+Um dos alunos com melhor desempenho. Submeteu script SQL completo com view `vw_estoque`, DER em PNG (conceitual + lógico) e backend Node.js/Express com todos os 8 endpoints exigidos implementados. Perdeu nota apenas em A07, A08 (formato de data ISO em vez de DD-MM-YYYY) e A11 (falta retornar `limite_min` e `limite_max` como campos distintos).
+
 ### Formato de data
-A maioria dos alunos perdeu nota em A07 e A08 por usar `yyyy-MM-dd` (ISO padrão Java/Python) em vez do exigido `DD-MM-YYYY`. Nenhum aluno atingiu nível 4 em A07 ou A08.
+A maioria dos alunos perdeu nota em A07 e A08 por usar `yyyy-MM-dd` (ISO padrão Java/Python/Node) em vez do exigido `DD-MM-YYYY`. Nenhum aluno atingiu nível 4 em A07 ou A08.
 
 ### View `vw_estoque` — nomes alternativos encontrados
 - **Juliana:** `v_relatorio_estoque` (nome diferente, mas funcionalidade equivalente) → nível 4 mantido
