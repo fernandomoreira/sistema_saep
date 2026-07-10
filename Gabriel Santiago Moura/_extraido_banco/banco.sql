@@ -1,0 +1,1 @@
+SELECT * FROM almoxarifado.vw_estoque;

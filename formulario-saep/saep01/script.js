@@ -178,7 +178,9 @@ const checklistContainer = document.getElementById("checklistContainer");
 const btnSalvar = document.getElementById("btnSalvar");
 const btnLimpar = document.getElementById("btnLimpar");
 const btnImprimir = document.getElementById("btnImprimir");
+const btnImprimirSimples = document.getElementById("btnImprimirSimples");
 const statusSalvo = document.getElementById("statusSalvo");
+const statusSalvoTopo = document.getElementById("statusSalvoTopo");
 
 // ---------------------------------------------------------------------------
 // Renderização da lista de alunos
@@ -401,7 +403,11 @@ function salvarAvaliacaoAtual() {
   };
   salvarRespostas(cpf, dados);
   statusSalvo.textContent = "Avaliação salva com sucesso.";
-  setTimeout(() => { statusSalvo.textContent = ""; }, 3000);
+  statusSalvoTopo.textContent = "Avaliação salva com sucesso.";
+  setTimeout(() => {
+    statusSalvo.textContent = "";
+    statusSalvoTopo.textContent = "";
+  }, 3000);
 }
 
 // ---------------------------------------------------------------------------
@@ -463,8 +469,132 @@ btnLimpar.addEventListener("click", () => {
 });
 
 btnImprimir.addEventListener("click", () => {
+  const aluno = alunos.find(a => a.cpf === alunoSelect.value);
+  const tituloOriginal = document.title;
+  if (aluno) document.title = aluno.nome;
   window.print();
+  document.title = tituloOriginal;
 });
+
+// ---------------------------------------------------------------------------
+// Relatório Simplificado
+// ---------------------------------------------------------------------------
+function imprimirSimplificado() {
+  const aluno = alunos.find(a => a.cpf === alunoSelect.value);
+  const respostas = coletarRespostasAtuais();
+
+  const GENERICAS = new Set([
+    "Nível inferior ao alcançado pelo aluno",
+    "Procedimento não localizado",
+    "Atividade realizada pelo aluno"
+  ]);
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function limparTexto(t) {
+    // Remove prefixo tipo "A03_00_C4+S3_0_" deixando só a descrição
+    return t.replace(/^A\d+_\d+_[^_]+_\d+_/, "").trim();
+  }
+
+  function getAtividade(t) {
+    const m = t.match(/^(A\d+)_/);
+    return m ? m[1] : null;
+  }
+
+  function renderItem(item, r) {
+    if (!r) return "";
+    if (/_S[67]_/.test(item.texto)) return ""; // sempre omite itens S6/S7
+    const txt = esc(limparTexto(item.texto));
+    if (r.sim) {
+      return `<p class="sim"><span class="label-sim">✓ SIM</span> ${txt}</p>`;
+    }
+    if (r.nao && r.justificativa && !GENERICAS.has(r.justificativa)) {
+      return `<p class="nao"><span class="label-nao">✗ NÃO</span> ${txt}<span class="just">↳ ${esc(r.justificativa)}</span></p>`;
+    }
+    return "";
+  }
+
+  let corpo = "";
+
+  CHECKLIST.forEach((bloco, ui) => {
+    corpo += `<h2>${esc(bloco.elemento)}</h2>`;
+
+    bloco.grupos.forEach((grupo, gi) => {
+      corpo += `<h3>${esc(grupo.titulo)}</h3>`;
+
+      // Agrupa itens por atividade (relevante para u1g0 que mistura A04–A11)
+      const porAtiv = new Map();
+      grupo.itens.forEach((item, ii) => {
+        const act = getAtividade(item.texto) || "?";
+        if (!porAtiv.has(act)) porAtiv.set(act, []);
+        porAtiv.get(act).push({ item, ii });
+      });
+
+      porAtiv.forEach((entries, act) => {
+        let blk = "";
+        entries.forEach(({ item, ii }) => {
+          blk += renderItem(item, respostas[`u${ui}_g${gi}_i${ii}`]);
+        });
+        if (!blk) return;
+        if (porAtiv.size > 1) corpo += `<div class="ativ">${act}</div>`;
+        corpo += blk;
+      });
+    });
+  });
+
+  const nomeAluno = aluno ? aluno.nome : "Relatório";
+  const dataFmt = dataInput.value
+    ? new Date(dataInput.value + "T12:00:00").toLocaleDateString("pt-BR")
+    : "—";
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>${esc(nomeAluno)}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #000; margin: 2cm; }
+  h1 { font-size: 14pt; text-align: center; border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 14px; }
+  .cab { font-size: 10.5pt; line-height: 1.8; margin-bottom: 18px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
+  h2 { font-size: 11pt; font-weight: bold; border-bottom: 1px solid #000; margin: 18px 0 6px; }
+  h3 { font-size: 10.5pt; font-weight: bold; margin: 10px 0 4px; }
+  .ativ { font-size: 10pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.4px; margin: 10px 0 2px 4px; border-left: 3px solid #555; padding-left: 6px; }
+  p.sim, p.nao { margin: 3px 0 5px 12px; font-size: 10.5pt; line-height: 1.45; }
+  .label-sim { font-weight: bold; margin-right: 4px; }
+  .label-nao { font-weight: bold; margin-right: 4px; }
+  .just { display: block; margin: 3px 0 2px 18px; font-style: italic; font-size: 10pt; color: #333; }
+  @media print { body { margin: 10mm; } }
+</style>
+</head>
+<body>
+<h1>Lista de Verificação — Relatório Simplificado</h1>
+<div class="cab">
+  <strong>Aluno:</strong> ${esc(aluno?.nome || "—")}&emsp;<strong>CPF:</strong> ${esc(aluno?.cpf || "—")}<br>
+  <strong>Avaliador:</strong> ${esc(avaliadorInput.value || "—")}&emsp;<strong>Data:</strong> ${dataFmt}&emsp;<strong>Edição:</strong> ${esc(edicaoInput.value || "—")}<br>
+  <strong>Curso:</strong> ${esc(cursoInput.value || "—")}
+</div>
+${corpo}
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
+btnImprimirSimples.addEventListener("click", imprimirSimplificado);
+
+document.getElementById("btnSalvarTopo").addEventListener("click", salvarAvaliacaoAtual);
+document.getElementById("btnLimparTopo").addEventListener("click", () => btnLimpar.click());
+document.getElementById("btnImprimirTopo").addEventListener("click", () => btnImprimir.click());
+document.getElementById("btnImprimirSimplesTopo").addEventListener("click", imprimirSimplificado);
 
 // ---------------------------------------------------------------------------
 // Inicialização

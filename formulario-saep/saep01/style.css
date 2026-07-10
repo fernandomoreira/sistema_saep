@@ -293,6 +293,12 @@ td.col-escala.marcado-nao {
   font-weight: 600;
 }
 
+.barra-acoes-topo {
+  position: static;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  margin-bottom: 18px;
+}
+
 @media (max-width: 700px) {
   .grid-2 { grid-template-columns: 1fr; }
   .barra-acoes { flex-wrap: wrap; }

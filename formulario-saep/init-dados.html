@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Inicializar Dados SAEP</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
+  h1 { color: #003399; }
+  .card { background: #fff; border-radius: 8px; padding: 20px; margin: 16px 0; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+  .ok { color: #1a7a1a; font-weight: bold; }
+  .btn { display: inline-block; margin-top: 20px; padding: 12px 28px; background: #003399; color: #fff; border-radius: 6px; text-decoration: none; font-size: 16px; }
+  .btn:hover { background: #0044cc; }
+  ul { margin: 8px 0; padding-left: 20px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Inicialização SAEP01 + SAEP02</h1>
+  <p>Clique no botão abaixo para carregar os dados de todos os 29 alunos nos formulários SAEP01 e SAEP02.</p>
+  <button onclick="inicializar()" style="padding:10px 24px;background:#003399;color:#fff;border:none;border-radius:6px;font-size:15px;cursor:pointer;">Inicializar dados</button>
+  <div id="resultado" style="margin-top:16px;"></div>
+</div>
+
+<script>
+// -----------------------------------------------------------------------
+// SAEP01 — mapeamento (atividade, nivel) → (u, g, i)
+// Estrutura da CHECKLIST01: u0g0=A03, u0g1=A02, u0g2=A01, u1g0=A04-A11+A10 (56 itens)
+// -----------------------------------------------------------------------
+const SAEP01_ACTS = [
+  { ai:0,  u:0, g:2, map: {0:0, 1:1, 2:2, 3:3, 4:4, "S6":5, "S7":6} },         // A01
+  { ai:1,  u:0, g:1, map: {0:0, 1:1, 2:2, 3:3, "S6":4, "S7":5, 4:6} },          // A02
+  { ai:2,  u:0, g:0, map: {0:0, 1:1, 2:2, 3:3, "S6":4, "S7":5, 4:6} },          // A03
+  { ai:3,  u:1, g:0, map: {0:0, 1:1, 2:2, 3:3, "S6":32, "S7":33, 4:48} },       // A04 (sem nível 4 real; i48 é o teto disponível)
+  { ai:4,  u:1, g:0, map: {0:4, 1:7, 2:9, 3:11, "S6":36, "S7":37, 4:49} },      // A05
+  { ai:5,  u:1, g:0, map: {0:5, 1:6, 2:8, 3:10, "S6":34, "S7":35, 4:50} },      // A06
+  { ai:6,  u:1, g:0, map: {0:12, 1:13, 2:14, 3:15, "S6":38, "S7":39, 4:51} },   // A07
+  { ai:7,  u:1, g:0, map: {0:16, 1:17, 2:18, 3:19, "S6":40, "S7":41, 4:52} },   // A08
+  { ai:8,  u:1, g:0, map: {0:20, 1:21, 2:22, 3:23, "S6":42, "S7":43, 4:53} },   // A09
+  { ai:9,  u:1, g:0, map: {0:28, 1:29, 2:30, 3:31, "S6":46, "S7":47, 4:55} },   // A10
+  { ai:10, u:1, g:0, map: {0:24, 1:25, 2:26, 3:27, "S6":44, "S7":45, 4:54} },   // A11
+];
+
+function gerarRespostas01(a) {
+  const r = {};
+  SAEP01_ACTS.forEach(act => {
+    const [nivel, just] = a[act.ai];
+    const nivelNum = (nivel !== "S6" && nivel !== "S7") ? Number(nivel) : null;
+
+    Object.entries(act.map).forEach(([k, i]) => {
+      const key = `u${act.u}_g${act.g}_i${i}`;
+
+      // Itens S6/S7 ("não realizou" / "tempo esgotado"): sempre Não, sem justificativa
+      if (k === "S6" || k === "S7") {
+        r[key] = { sim: false, nao: true, justificativa: "" };
+        return;
+      }
+
+      if (nivelNum === null) {
+        // Aluno não realizou a atividade: todos os itens de nível ficam Não
+        r[key] = { sim: false, nao: true, justificativa: "Procedimento não localizado" };
+      } else {
+        const kN = Number(k);
+        if (kN === nivelNum) {
+          r[key] = { sim: true, nao: false, justificativa: "" };
+        } else if (kN < nivelNum) {
+          r[key] = { sim: false, nao: true, justificativa: "Nível inferior ao alcançado pelo aluno" };
+        } else {
+          r[key] = { sim: false, nao: true, justificativa: just };
+        }
+      }
+    });
+  });
+  return r;
+}
+
+// -----------------------------------------------------------------------
+// SAEP02 — Mapeamento nivel → índice do item que recebe "Sim" (0-6)
+// -----------------------------------------------------------------------
+function simIdx(nivel) {
+  if (nivel === "S6") return 0;
+  if (nivel === "S7") return 1;
+  if (nivel === 0)   return 2;
+  if (nivel === 1)   return 3;
+  if (nivel === 2)   return 4;
+  if (nivel === 3)   return 5;
+  if (nivel === 4)   return 6;
+  return 0;
+}
+
+function gerarRespostas(a) {
+  const r = {};
+  a.forEach(([nivel, just], ai) => {
+    // i0 (S6) e i1 (S7): sempre Não, sem justificativa
+    r[`a${ai}_i0`] = { sim: false, nao: true, justificativa: "" };
+    r[`a${ai}_i1`] = { sim: false, nao: true, justificativa: "" };
+
+    if (nivel === "S6" || nivel === "S7") {
+      // Atividade não realizada
+      for (let i = 2; i <= 6; i++) {
+        r[`a${ai}_i${i}`] = { sim: false, nao: true, justificativa: "Procedimento não localizado" };
+      }
+    } else {
+      const si = simIdx(nivel); // i2-i6
+      for (let i = 2; i <= 6; i++) {
+        if (i === si) {
+          r[`a${ai}_i${i}`] = { sim: true, nao: false, justificativa: "" };
+        } else if (i < si) {
+          r[`a${ai}_i${i}`] = { sim: false, nao: true, justificativa: "Nível inferior ao alcançado pelo aluno" };
+        } else {
+          r[`a${ai}_i${i}`] = { sim: false, nao: true, justificativa: just };
+        }
+      }
+    }
+  });
+  return r;
+}
+
+// -----------------------------------------------------------------------
+// Dados dos alunos  [nivel, justificativa] para A01..A11
+// -----------------------------------------------------------------------
+const META = {
+  avaliador: "Linaldo da Exaltacao Santos",
+  curso: "TÉCNICO EM DESENVOLVIMENTO DE SISTEMAS",
+  data: "2026-06-30",
+  hora: "08:00",
+  edicao: "2021"
+};
+
+const ALUNOS = [
+  {
+    nome: "Anderson Luciano Dos Santos Junior",
+    cpf: "086.320.535-66",
+    a: [
+      ["S6","O arquivo script_banco.sql está vazio. Não foi submetido nenhum script SQL funcional."],
+      ["S6","Nenhuma view vw_estoque foi criada. O main.py calcula valor total via SQL embutido sem uso de view."],
+      ["S6","Arquivo .brM3 presente mas não legível; SQL vazio impossibilita inferência de DER."],
+      [2,"Função valor_total_categoria() usa SQL direto sem usar view vw_estoque."],
+      [3,"Função listar_produtos() retorna 6 campos via SQL. Faltam limite_min e limite_max."],
+      [3,"Função cadastrar_produto() valida quantidade e valor_unitário. Falta verificação de duplicidade e try/except."],
+      [3,"Função listar_saidas() ordena por data_saida DESC com 4 campos. Data não formatada como DD-MM-YYYY."],
+      [3,"Função registrar_entrada() insere e atualiza saldo. Data em AAAA-MM-DD, sem conversão para DD-MM-YYYY."],
+      [4,"Função movimentacoes_periodo() retorna 7 campos completos com filtro por período."],
+      [4,"Função maior_volume_saida() retorna 3 campos obrigatórios, agrupado e ordenado por total_saida DESC."],
+      [2,"Função estoque_minimo_maximo() retorna apenas nome e quantidade (2 campos). Faltam limite_min e limite_max. Limites hardcoded."]
+    ]
+  },
+  {
+    nome: "Cauã Costa Sena",
+    cpf: "000.000.002-02",
+    a: [
+      [4,"Script SQL completo com 4 tabelas, PKs e FKs com ENGINE InnoDB. Mínimo de 3 registros por tabela."],
+      [4,"View vw_estoque retorna 6 colunas incluindo usuario_responsavel. Cálculo correto."],
+      [3,"Arquivo .brM3 presente mas não legível. SQL evidencia 4+ dos 6 elementos. Cardinalidade não verificável."],
+      ["S6","Controllers (EstoqueController, MovimentacaoController, ProdutoController) estão todos vazios."],
+      [2,"AlmoxarifadoService.listarProdutos() existe mas ProdutoController está vazio — não exposta via API."],
+      [3,"ProdutoService.cadastrar() valida valorUnitario, quantidade, categoria. Sem verificação de duplicidade."],
+      ["S6","MovimentacaoController e MovimentacaoService estão completamente vazios."],
+      [3,"AlmoxarifadoService.registrarMovimentacao() registra e atualiza saldo. Sem formatação DD-MM-YYYY."],
+      ["S6","Nenhuma função de relatório por período foi implementada em nenhum service ou controller."],
+      ["S6","Nenhuma função de produtos com maior volume de saída foi implementada."],
+      ["S6","Nenhuma função de produtos em nível mínimo/máximo. Entidade Produto sem campos limite_min/limite_max."]
+    ]
+  },
+  {
+    nome: "Cauã Santos Silva",
+    cpf: "000.000.003-03",
+    a: [
+      [3,"Script com 5 tabelas, PKs e FKs com CASCADE. Porém sem INSERT de dados e sem campos limite_min/limite_max."],
+      ["S6","Nenhuma view vw_estoque foi criada no script SQL ou em qualquer arquivo do projeto."],
+      [3,"Arquivo .brM3 presente mas não legível. SQL demonstra entidades, atributos, PKs e FKs. Inferindo 4+ dos 6 elementos."],
+      ["S6","ProdutoService tem apenas cadastrarProduto() e listarTodos(). Sem função de valor total por categoria."],
+      [2,"ProdutoService.listarTodos() delega a produtoRepository.findAll(). A entidade Produto.java está vazia (sem campos)."],
+      [3,"ProdutoService.cadastrarProduto() valida categoria, quantidade >= 0 e valorUnitario > 0. Falta duplicidade."],
+      ["S6","Nenhuma função de listar saídas foi implementada."],
+      ["S6","Nenhuma função de registrar entrada foi implementada."],
+      ["S6","Nenhuma função de relatório por período foi implementada."],
+      ["S6","Nenhuma função de maior volume de saída foi implementada."],
+      ["S6","Nenhuma função de produtos em limite mínimo/máximo foi implementada."]
+    ]
+  },
+  {
+    nome: "Davi Asafe Falcão Guimarães",
+    cpf: "000.000.004-04",
+    a: [
+      [3,"Script com 3 tabelas, PKs e FKs, 3+ registros. Porém faltam campos limite_min, limite_max e unidade_medida. Sem view."],
+      ["S6","Nenhuma view vw_estoque foi criada no script SQL ou no código Python."],
+      ["S6","Não há arquivo .brM3 nem imagem de diagrama ER. Arquivos .png são capturas de tela do sistema."],
+      [2,"Função valor_total_categoria() calcula quantidade*valor_unitario visualmente sem GROUP BY SQL por categoria."],
+      [2,"Função listar_produtos() usa SELECT * FROM produtos. Retorna 5 campos. Faltam unidade_medida, limite_min e limite_max."],
+      [3,"Função cadastrar_produto() valida nome, categoria, quantidade >= 0 (try/except) e valor > 0. Falta verificação de duplicidade."],
+      [3,"Função listar_saidas() filtra SAIDA e ordena por datetime DESC. Data no formato DD/MM/YYYY HH:MM, não DD-MM-YYYY."],
+      [3,"Função entrada_produto() atualiza estoque e insere movimentação. Data formatada como DD/MM/YYYY HH:MM, não DD-MM-YYYY."],
+      ["S6","Não há função de relatório de entradas e saídas por período."],
+      ["S6","Não há função de produtos com maior volume de saída por período."],
+      ["S6","Não há função de produtos em nível mínimo/máximo. Tabela de produtos sem campos limite_min e limite_max."]
+    ]
+  },
+  {
+    nome: "David Oliveira dos Santos Caldas",
+    cpf: "000.000.005-05",
+    a: [
+      [4,"Script completo: 5 tabelas com Estoque_Minimo DEFAULT 0, Estoque_Maximo DEFAULT 100, CHECK constraints, PKs, FKs, 3+ registros."],
+      [4,"View vw_estoque retorna 7 campos incluindo Id_Produto, Produto, Categoria, Unidade_Medida, Quantidade, Valor_Unitario, Valor_Total_Item."],
+      [3,"Sem arquivo .brM3 nem imagem de DER. SQL evidencia estrutura robusta com 4+ elementos. Cardinalidade não verificável."],
+      [4,"RelatorioDAO.valorTotalPorCategoria() usa a view vw_estoque: SELECT Categoria, SUM(Valor_Total_Item) FROM vw_estoque GROUP BY Categoria."],
+      [4,"ProdutoDAO.listarTodos() retorna 6 campos via JOIN: Id_Produto, Nome, Unidade_Medida, Quantidade, Valor_Unitario, Categoria."],
+      [4,"ProdutoDAO.cadastrar() chama validarProduto() e verifica se categoria existe. Inclui tratamento de erros (IllegalArgumentException)."],
+      [3,"RelatorioDAO.listarSaidasDecrescente() usa WHERE Tipo='S' ORDER BY Data_Movimentacao DESC. Retorna 5 campos. Data via rs.getDate() sem formatação DD-MM-YYYY."],
+      [3,"MovimentacaoDAO registra em transação, valida saldo e estoque máximo. Data inserida como Date.valueOf() (AAAA-MM-DD). Sem formato DD-MM-YYYY."],
+      [4,"RelatorioDAO.movimentacoesPeriodo() retorna 7 campos: Produto, Unidade_Medida, Entradas, Saidas, SaldoPeriodo, ValorEntradas, ValorSaidas."],
+      [4,"RelatorioDAO.maioresSaidasPeriodo() retorna 3 campos: Produto, QtdSaida (SUM), ValorSaidas. Filtro por tipo='S' e período. Ordenado DESC."],
+      [4,"RelatorioDAO.produtosLimites() retorna 5 campos incluindo Percentual ((Quantidade/Estoque_Maximo)*100). Filtra WHERE Qtd<=Min OR Qtd>=Max."]
+    ]
+  },
+  {
+    nome: "Eric Felix de Almaço Parente",
+    cpf: "000.000.006-06",
+    a: [
+      [3,"Script com tabelas categoria, produto, movimentacao, PKs e FKs, 3 registros por tabela. Porém sem campos limite_min e limite_max e sem view."],
+      ["S6","Nenhuma view vw_estoque foi criada em nenhum dos 4 arquivos SQL submetidos."],
+      [3,"Arquivos .brM3 presentes mas não legíveis. SQL evidencia entidades, atributos, AUTO_INCREMENT, PKs e FKs nomeadas. Inferindo 4 dos 6 elementos."],
+      ["S6","Sem backend de código. Nenhuma função de valor total por categoria implementada."],
+      ["S6","Sem backend de código. Nenhuma função de listagem de produtos implementada."],
+      ["S6","Sem backend de código. Nenhuma função de cadastro de produto implementada."],
+      ["S6","Sem backend de código. Nenhuma função de listar saídas implementada."],
+      ["S6","Sem backend de código. Nenhuma função de registrar entrada implementada."],
+      ["S6","Sem backend de código. Nenhuma função de relatório por período implementada."],
+      ["S6","Sem backend de código. Nenhuma função de maior volume de saída implementada."],
+      ["S6","Sem backend de código. Tabela produto sem campos limite_min/limite_max."]
+    ]
+  },
+  {
+    nome: "Filipe Cauã da Silva Souza",
+    cpf: "000.000.007-07",
+    a: [
+      [0,"O arquivo saep.sql contém apenas CREATE DATABASE e USE estoque, sem nenhuma tabela, FK ou dados."],
+      ["S6","Nenhum CREATE VIEW encontrado em nenhum arquivo. O Python referencia vw_estoque mas a view não foi criada no banco."],
+      [3,"Submeteu dois arquivos .brM3. Pelo código Python, contempla entidades, atributos, PKs, FKs e relacionamentos — provável 4+ dos 6 elementos."],
+      ["S6","Nenhuma função de listagem de valor total por categoria foi implementada no Python."],
+      [3,"Função listar_produtos() seleciona 6 campos (id_produto, nome, unidade_medida, quantidade, valor_unitario, id_categoria)."],
+      [2,"Função cadastrar_produto() insere dados corretamente, mas sem nenhuma validação de campos, duplicidade ou tratamento de erros."],
+      [2,"Função listar_movimentacoes() usa ORDER BY data_movimentacao DESC mas retorna TODAS as movimentações, não apenas saídas."],
+      [3,"registrar_entrada() insere e atualiza saldo (UPDATE quantidade = quantidade + X). Data com date.today() em ISO, sem conversão para DD-MM-YYYY."],
+      ["S6","Nenhuma função de relatório por período (data_inicial/data_final) foi implementada."],
+      ["S6","Nenhuma função de produtos com maior volume de saída foi implementada."],
+      ["S6","Nenhuma função de nível mínimo/máximo de estoque foi implementada."]
+    ]
+  },
+  {
+    nome: "Gabriel Almeida Lima Macedo",
+    cpf: "000.000.008-08",
+    a: [
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."],
+      ["S6","Pasta sem nenhum arquivo legível submetido."]
+    ]
+  },
+  {
+    nome: "Gabriel Araújo Bitencourt",
+    cpf: "000.000.009-09",
+    a: [
+      [3,"Script com 4 tabelas, PKs e FKs com RESTRICT, 3 registros em cada tabela. Porém PKs manuais (sem AUTO_INCREMENT) e produto sem limite_min/limite_max."],
+      [4,"View vw_estoque com 6 colunas: produto_id, nome_produto, nome_categoria, quantidade_atual, preco_unitario, valor_total_item. Calcula corretamente com INNER JOIN."],
+      [3,"Sem arquivo .brM3. Pelo SQL: contempla 4+ elementos (entidades, atributos, PKs, FKs, relacionamentos). Falta AUTO_INCREMENT e cardinalidade explícita."],
+      [3,"Criou view vw_valor_por_categoria com 4 colunas. Resultado correto mas implementado como view, sem procedure chamável pelo backend."],
+      ["S6","Solução apenas SQL/procedures. Nenhuma procedure para listar todos os produtos cadastrados foi implementada."],
+      ["S6","Solução apenas SQL/procedures. Nenhuma procedure para cadastrar produto com validações foi implementada."],
+      ["S6","Solução apenas SQL/procedures. Nenhuma procedure para listar saídas em ordem decrescente foi implementada."],
+      [2,"Trigger atualiza estoque ao INSERT em entrada e valida estoque antes da saída. Sem procedure explícita e sem formatação de data DD-MM-YYYY."],
+      [3,"Procedure sp_relatorio_movimentacoes filtra por período via BETWEEN. Porém retorna linhas individuais, não formato agregado (total_entradas, total_saidas, saldo_periodo)."],
+      [4,"Procedure sp_produtos_maior_saida retorna nome_produto, quantidade_total_saida (SUM) e valor_total_financeiro_saida (SUM), ordenado DESC. Cálculo preciso."],
+      ["S6","Nenhuma procedure ou consulta para verificar produtos em nível mínimo/máximo de estoque foi implementada."]
+    ]
+  },
+  {
+    nome: "Gabriel Santiago Moura",
+    cpf: "000.000.010-10",
+    a: [
+      [0,"O único arquivo SQL legível contém apenas 'SELECT * FROM almoxarifado.vw_estoque;'. Nenhuma tabela criada, nenhuma estrutura de banco."],
+      ["S6","Nenhuma view criada. O SQL apenas faz SELECT de uma view não definida no script."],
+      ["S6","Não submeteu arquivo .brM3 nem diagrama legível. Apenas PNG de captura de tela, sem diagrama implementado."],
+      ["S6","Nenhuma implementação submetida."],
+      ["S6","Nenhuma implementação submetida."],
+      ["S6","Nenhuma implementação submetida."],
+      ["S6","Nenhuma implementação submetida."],
+      ["S6","Nenhuma implementação submetida."],
+      ["S6","Nenhuma implementação submetida."],
+      ["S6","Nenhuma implementação submetida."],
+      ["S6","Nenhuma implementação submetida."]
+    ]
+  },
+  {
+    nome: "Gabriel Santos Santana",
+    cpf: "000.000.011-11",
+    a: [
+      [3,"Script com 3 tabelas, AUTO_INCREMENT, PKs, FKs, 3 registros por tabela. Faltam: limite_min e limite_max no produto."],
+      ["S6","Nenhum CREATE VIEW em nenhum arquivo SQL. A API Spring Boot não cria nem referencia a view vw_estoque."],
+      [3,"Submeteu dois arquivos .brM3. Pela estrutura JPA (entidades com @ManyToOne): contempla 4+ elementos. Faltam limite_min/limite_max."],
+      ["S6","Nenhum endpoint ou query para listar valor total por categoria. CategoriaController lista apenas categorias sem totais financeiros."],
+      [3,"ProdutoController GET /produto chama findAll() retornando 6 campos via JSON (id, nome, unidadeMedida, quantidade, valorUnitario, categoria). Sem @Valid."],
+      [2,"ProdutoController POST /produto salva com produtoRepo.save(p) sem @Valid, sem verificação de duplicidade, sem validação de campos e sem tratamento de erros."],
+      [3,"GET /movimentacao/saida filtra apenas saídas e ordena por data DESC. Retorna 6 campos. Data em formato ISO (yyyy-MM-dd), não DD-MM-YYYY."],
+      [3,"POST /movimentacao/entrada/{id} soma quantidade, define tipo='ENTRADA', data=LocalDate.now() e salva. Saldo atualizado. Sem formato DD-MM-YYYY."],
+      ["S6","Nenhum endpoint ou procedure para relatório de entrada e saída por período implementado."],
+      ["S6","Nenhum endpoint ou procedure para produtos com maior volume de saída implementado."],
+      ["S6","Nenhum endpoint ou procedure para produtos em nível mínimo/máximo implementado."]
+    ]
+  },
+  {
+    nome: "Giselle Mota Lima",
+    cpf: "000.000.012-12",
+    a: [
+      [2,"Script cria tabelas Produto, Entrada e Saida com PKs manuais e FKs. Porém categoria é campo VARCHAR (sem tabela separada), sem registros e sem AUTO_INCREMENT."],
+      ["S6","Os dois arquivos SQL são idênticos e não contêm nenhum CREATE VIEW."],
+      [2,"Submeteu dois arquivos .brM3. Pelo SQL: 3 entidades, PKs e FKs. Contempla 2-3 dos 6 elementos — sem categoria separada, sem AUTO_INCREMENT, sem cardinalidade."],
+      ["S6","Sem backend implementado."],
+      ["S6","Sem backend implementado."],
+      ["S6","Sem backend implementado."],
+      ["S6","Sem backend implementado."],
+      ["S6","Sem backend implementado."],
+      ["S6","Sem backend implementado."],
+      ["S6","Sem backend implementado."],
+      ["S6","Sem backend implementado."]
+    ]
+  },
+  {
+    nome: "Isaac Newton Rodrigues Santana",
+    cpf: "000.000.013-13",
+    a: [
+      [3,"SQL cria 4 tabelas com PKs AUTO_INCREMENT e FKs com ON DELETE/UPDATE. Estrutura correta. Porém nenhum INSERT de dados foi incluído."],
+      ["S6","Não criou nenhuma VIEW vw_estoque nos arquivos SQL entregues."],
+      ["S6","Não submeteu DER. Nenhuma imagem ou arquivo de diagrama encontrado na pasta."],
+      ["S6","CategoriaController.java é classe vazia (template NetBeans). Nenhuma implementação de listagem por categoria."],
+      ["S6","ProdutoController.java e ProdutoDao.java são classes vazias (templates). Nenhuma funcionalidade implementada."],
+      ["S6","ProdutoController.java e ProdutoDao.java estão vazios. Nenhuma funcionalidade de cadastro implementada."],
+      ["S6","MovimentacaoController.java e MovimentacaoDao.java estão vazios. Nenhuma listagem de saídas implementada."],
+      ["S6","MovimentacaoController.java e MovimentacaoDao.java estão vazios. Nenhuma entrada de produtos implementada."],
+      ["S6","Nenhum relatório por período implementado."],
+      ["S6","Nenhuma funcionalidade de maior volume de saída implementada."],
+      ["S6","Nenhuma funcionalidade de nível mín/máx implementada."]
+    ]
+  },
+  {
+    nome: "Isaac Salomão Carmo",
+    cpf: "000.000.014-14",
+    a: [
+      [4,"4 tabelas com PKs AUTO_INCREMENT e FKs. Insere 3 categorias, 3 produtos e 3 saídas em arquivos SQL separados. Nível 4."],
+      [4,"vw_estoque com 6 colunas: id_produto, nome, categoria (JOIN), quantidade, valor_unitario, valor_total. Cálculo correto."],
+      ["S6","Entregou o arquivo brmodelo.jar (o próprio executável do programa brModelo), não um diagrama."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhuma implementação de listagem por categoria no backend."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhuma implementação de listagem de produtos."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhuma implementação de cadastro de produto."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhuma implementação de listagem de saídas."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhuma implementação de entrada de produtos."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhum relatório por período."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhuma funcionalidade de maior volume de saída."],
+      ["S6","Apenas SQL entregue, sem backend. Nenhuma funcionalidade de nível mín/máx."]
+    ]
+  },
+  {
+    nome: "Ítalo Brito dos Santos",
+    cpf: "000.000.015-15",
+    a: [
+      [4,"banco almoxarifado_senai com 3 tabelas, PKs AUTO_INCREMENT, FKs com ON DELETE SET NULL / CASCADE. Insere 3 categorias, 3 produtos e 3 movimentações."],
+      [3,"vw_estoque com 5 colunas: id_produto, nome_produto, quantidade_estoque, valor_unitario, valor_total. Cálculo correto. Porém sem coluna nome_categoria."],
+      [4,"Entregou 2 imagens PNG: modelo lógico e DER conceitual com entidades (Categoria, Produto, Movimentacao), atributos, PKs (bola cheia), relacionamentos com cardinalidades (0,n)/(1,1). 6 elementos presentes."],
+      ["S6","Sem backend. mysql2.sql contém apenas SELECTs básicos sem agrupamento por categoria."],
+      [2,"mysql2.sql retorna 4 campos via SQL: nome_produto, quantidade_estoque, valor_unitario, nome_categoria. Apenas SQL sem backend funcional."],
+      ["S6","Sem backend implementado para cadastro de produto."],
+      [2,"mysql2.sql retorna 4 campos: data_movimento, tipo, quantidade, nome_produto. Sem ORDER BY data DESC e sem formato DD-MM-YYYY. Apenas SQL."],
+      ["S6","Sem backend para registrar entrada e atualizar saldo."],
+      ["S6","Sem implementação de relatório por período com filtro de datas."],
+      ["S6","Sem implementação de maior volume de saída."],
+      ["S6","Sem implementação de nível mín/máx."]
+    ]
+  },
+  {
+    nome: "João Victor Souza Alves dos Santos",
+    cpf: "000.000.016-16",
+    a: [
+      ["S6","Pasta completamente vazia. Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."],
+      ["S6","Nenhum arquivo entregue."]
+    ]
+  },
+  {
+    nome: "João Vitor Pereira Da Rocha",
+    cpf: "000.000.017-17",
+    a: [
+      [4,"bancosaeb.sql com tabelas Categoria, Produto, Entrada, Saida, PKs AUTO_INCREMENT e FKs. INSERTs: 3 categorias, 3 produtos, 3 entradas, 3 saídas."],
+      [3,"vw_estoque com 5 colunas: id_produto, nome, quantidade_registrada, valor_unitario, valor_total_item. Cálculo correto. Sem coluna nome_categoria."],
+      ["S6","Tem arquivos .brM3 (binários não legíveis). Nenhum DER exportado em formato PNG ou similar foi entregue."],
+      [3,"ProdutoRepository: SELECT c.nome as categoria, SUM(p.quantidade * p.valor_unitario) as valorTotal FROM Produto p JOIN Categoria c GROUP BY c.nome. Sem ORDER BY valor."],
+      [3,"AlmoxarifadoController GET /produtos retorna findAll() com 6 campos JPA. @Valid e @NotBlank/@NotNull/@Min/@DecimalMin definidos no modelo."],
+      [4,"AlmoxarifadoController POST /produtos com @Valid: @NotBlank(nome, unidade), @NotNull @Min(0) (quantidade), @NotNull @DecimalMin>0 (valor), @NotNull (categoria). Validações completas."],
+      [3,"GET /saidas chama saidaRepository.findAllByOrderByDataFinalDesc(). Ordenação DESC por data implementada. Sem formato DD-MM-YYYY."],
+      [3,"POST /entradas busca produto, soma quantidade, salva produto atualizado e salva entrada com data LocalDateTime.now(). Atualiza saldo. Sem formato DD-MM-YYYY."],
+      [4,"findMovimentacoesNoPeriodo retorna 7 campos: nomeProduto, unidadeMedida, totalEntradas, totalSaidas, saldoPeriodo, valorTotalEntradas, valorTotalSaidas."],
+      [4,"findMaioresSaidasNoPeriodo: 3 campos: nomeProduto, quantidadeTotalSaida (SUM), valorTotalSaidas (SUM). Agrupado por produto, ordenado DESC."],
+      [2,"findProdutosNosLimites usa WHERE quantidade = 0 OR quantidade >= 100 (limites hardcoded, não usa colunas limite_minimo/limite_maximo do banco)."]
+    ]
+  },
+  {
+    nome: "Juliana Costa Silva",
+    cpf: "000.000.018-18",
+    a: [
+      [2,"BancoSAEP.sql cria tabelas produto (categoria como VARCHAR, sem tabela separada), ENTRADA e SAIDA com FKs. PKs presentes mas sem INSERTs de dados."],
+      [4,"v_relatorio_estoque com 9 colunas: ID, Produto, Categoria, Unidade, Preço Unitário, Estoque Atual, Total Entradas (COALESCE SUM), Total Saídas, Valor Total. Nível 4 (nome difere de vw_estoque)."],
+      ["S6","Tem arquivos LogicoSAEP.brM3 e ConceitualSAEP.brM3 (binários não legíveis). Nenhum DER exportado como imagem foi entregue."],
+      ["S6","ProdutoRepository é JpaRepository básico sem queries customizadas. Produto usa categoria como VARCHAR. Sem listagem por categoria com SUM/GROUP BY."],
+      [3,"ProdutoController GET /produtos chama findAll(). Modelo Produto tem 6 campos: id_produto, nome, categoria, quantidade, valor_unitario, unidade_medida. Sem @Valid."],
+      [2,"ProdutoController POST /produtos sem @Valid. ProdutoService.salvar() chama produtoRepository.save() sem validações. Sem @NotNull/@NotBlank no modelo."],
+      [1,"SaidaController GET /saidas usa SaidaRepository.findAll() sem ordenação. Modelo Saida tem: id_saida, data_final, quantidade_saida, produto. Sem ORDER BY. Sem formato DD-MM-YYYY."],
+      [3,"EntradaService.salvar() busca produto, soma quantidade, salva produto atualizado e depois salva entrada. Atualiza saldo corretamente. Sem formato DD-MM-YYYY."],
+      ["S6","Nenhuma implementação de relatório por período. Repositórios sem queries com filtro de data início/fim."],
+      ["S6","Nenhuma implementação de maior volume de saída. SaidaRepository sem queries de agrupamento/soma."],
+      ["S6","Nenhuma implementação de nível mín/máx. Modelo Produto sem campos limite_minimo/limite_maximo."]
+    ]
+  },
+  {
+    nome: "Kauã Batista Neves",
+    cpf: "000.000.019-19",
+    a: [
+      ["S6","Não submeteu nenhum arquivo. Pasta completamente vazia."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."]
+    ]
+  },
+  {
+    nome: "Kauan Gabriel Souza Dias dos Santos",
+    cpf: "000.000.020-20",
+    a: [
+      [4,"banco.sql com tabelas (produtos, entradas, saidas), PKs AUTO_INCREMENT, FKs, 3 registros em cada tabela. AlmoxarifadoKaua_Corrigido.sql com 5 tabelas."],
+      [4,"View vw_estoque com 6 colunas: id, nome, categoria, quantidade, valor_unitario, valor_total (quantidade * valor_unitario). Supera o mínimo de 5 colunas."],
+      ["S6","Arquivo .brM3 não legível. Não há imagem ou DER exportado em formato legível."],
+      [4,"Função valor_por_categoria() executa SELECT categoria, SUM(quantidade * valor_unitario) FROM produtos GROUP BY categoria. Cálculo correto."],
+      [4,"Função listar_produtos_da_view() consulta a vw_estoque retornando 6 campos: ID, Nome, Categoria, Qtd, Preço Unitário e Total."],
+      [4,"Função cadastrar_produto() valida: categoria obrigatória, quantidade não negativa, valor unitário > 0. try/except no obter_conexao(). Error handling completo."],
+      [3,"Função listar_saidas_decrescente() ordena por data_saida DESC. Exibe ID, Produto, Data e Quantidade. Data exibida no formato YYYY-MM-DD, não DD-MM-YYYY."],
+      [3,"Função registrar_entrada() insere na tabela entradas e atualiza a quantidade. Funcional e correto. Sem formatação explícita da data para DD-MM-YYYY."],
+      [4,"Função movimentacoes_por_periodo() retorna 7 campos: nome, unidade_medida, total_entradas, total_saidas, saldo_periodo, valor_financeiro_entradas e valor_financeiro_saidas."],
+      [4,"Função maior_volume_saida() retorna 3 campos: nome do produto, quantidade total e valor financeiro total. Ordena por total DESC com filtro de período."],
+      [4,"Função verificar_limites_estoque() verifica mínimo (qtd <= 0) e máximo (qtd >= 100). Calcula e exibe percentual de ocupação."]
+    ]
+  },
+  {
+    nome: "Levi Ferreira de Melo",
+    cpf: "000.000.021-21",
+    a: [
+      ["S6","Não submeteu nenhum arquivo. Pasta completamente vazia."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."],
+      ["S6","Não submeteu nenhum arquivo."]
+    ]
+  },
+  {
+    nome: "Luis Felipe da Silva Paixão",
+    cpf: "000.000.022-22",
+    a: [
+      [3,"Banco.sql cria 4 tabelas com PKs AUTO_INCREMENT e FKs, 3+ registros. Porém sem unidade_medida, limite_min e limite_max e sem view vw_estoque."],
+      ["S6","Não foi criada a view vw_estoque no script SQL. O sistema Java usa dados em memória sem view SQL."],
+      ["S6","Arquivo .brM3 não legível. Sem imagem ou DER exportado em formato legível."],
+      [4,"Método listarValorTotalPorCategoria() calcula SUM(quantidade * valorUnitario) agrupado por categoria com HashMap, ordenado por nome de categoria."],
+      [3,"Método listarProdutos() exibe 5 campos: Nome, Categoria, Unidade, Valor e Quantidade. Falta o campo ID do produto para atingir 6 campos de nível 4."],
+      [4,"Método cadastrarProduto() valida: nome, unidade de medida, valor unitário (>= 0), quantidade (>= 0) e verifica duplicidade. Tratamento de erros completo."],
+      [3,"Método listarSaidasPorDataDecrescente() filtra SAIDA e ordena por data decrescente. Data exibida no formato LocalDate (yyyy-MM-dd), não dd-MM-yyyy."],
+      [3,"Método registrarMovimentacao() registra entrada atualizando a quantidade. Valida produto existente, quantidade positiva. Sem padronização de exibição DD-MM-YYYY."],
+      [1,"Não há método de relatório por período no formato exigido. listarMovimentacoesPorProduto() filtra por produto, não por período de datas."],
+      [3,"Método produtosMaiorSaidaNoPeriodo() soma por produto e exibe nome e total de saída (2 campos). Falta o campo de valor financeiro total."],
+      [3,"Método identificarProdutosLimites() lista produtos com quantidade <= 0 (mínimo) e >= 100 (máximo). Exibe nome, quantidade e classificação. Sem cálculo de percentual."]
+    ]
+  },
+  {
+    nome: "Marcos Paulo Oliveira Silva",
+    cpf: "000.000.023-23",
+    a: [
+      [4,"script.sql cria banco Estoque com tabelas Categoria, Produto (com limite_minimo e limite_maximo) e Movimentacao com ENUM ENTRADA/SAIDA. PKs AUTO_INCREMENT e FKs. 3+ registros."],
+      [3,"View vw_estoque com 5 colunas: id, nome, quantidade_atual, valor_unitario e valor_total. Cálculo correto. Porém falta a coluna 'categoria'."],
+      ["S6","Arquivo .brM3 não legível. Sem imagem ou DER exportado em formato legível."],
+      ["S6","Backend (ZIP) corrompido/não extraído. Apenas o script.sql foi avaliado. Sem código backend funcional."],
+      ["S6","Backend (ZIP) corrompido. Sem código de listagem de produtos avaliável."],
+      ["S6","Backend (ZIP) corrompido. Sem código de cadastro de produto avaliável."],
+      ["S6","Backend (ZIP) corrompido. Sem código de listagem de saídas avaliável."],
+      ["S6","Backend (ZIP) corrompido. Sem código de entrada de estoque avaliável."],
+      ["S6","Backend (ZIP) corrompido. Sem código de relatório por período avaliável."],
+      ["S6","Backend (ZIP) corrompido. Sem código de maior volume de saída avaliável."],
+      ["S6","Backend (ZIP) corrompido. Script SQL tem colunas limite_minimo e limite_maximo mas sem lógica de backend avaliável."]
+    ]
+  },
+  {
+    nome: "Mário Augusto Mutti Hohenfeld",
+    cpf: "000.000.024-24",
+    a: [
+      ["S6","Não submeteu script SQL. Apenas arquivos .brM3 e imagens PNG encontrados."],
+      ["S6","Não submeteu script SQL. Sem view vw_estoque."],
+      [2,"DER visível em PNG do brModelo com entidades (Produto, Empresa), atributos e cardinalidade (0,n). Porém 'Data Final' modelada como entidade, Empresa sem atributos nem chave, sem id_auto/PKs explícitas."],
+      ["S6","Sem código backend. Segunda imagem mostra planilha Google Sheets, não um sistema programado."],
+      ["S6","Sem código backend."],
+      ["S6","Sem código backend."],
+      ["S6","Sem código backend."],
+      ["S6","Sem código backend."],
+      ["S6","Sem código backend."],
+      ["S6","Sem código backend."],
+      ["S6","Sem código backend."]
+    ]
+  },
+  {
+    nome: "Miguel Estrela dos Santos",
+    cpf: "000.000.025-25",
+    a: [
+      [4,"Script cria banco e 5 tabelas com PRIMARY KEY AUTO_INCREMENT e FOREIGN KEYs. Insere 3 registros em cada tabela. Sintaxe MySQL válida."],
+      [4,"View vw_estoque com 6 colunas: id_produto, nome, unidade_medida, quantidade_, valor_unitario, (quantidade_ * valor_unitario) AS valor_total. Cálculo correto."],
+      ["S6","Arquivo .brM3 não legível como texto. Nenhum DER em formato de imagem (PNG, PDF) encontrado nos arquivos submetidos."],
+      [0,"Nenhuma query ou endpoint para listar valor total por categoria. MovimentacaoService está vazio. Nenhuma consulta GROUP BY categoria implementada."],
+      [2,"ProdutoController GET /produtos retorna lista de Produto com mais de 3 campos. Porém sem ordenação explícita, sem validações de filtro e sem método customizado."],
+      [1,"ProdutoController POST /produtos chama service.salvar(produto). ProdutoService apenas chama repository.save(produto) sem qualquer validação ou tratamento de erros."],
+      ["S6","MovimentacaoController e MovimentacaoRepository não implementam listagem filtrada por tipo 'SAIDA' em ordem decrescente de data."],
+      [1,"Não há endpoint ou serviço de entrada de estoque com lógica de atualização de quantidade. MovimentacaoService está vazio."],
+      ["S6","Nenhum endpoint ou consulta de relatório por período implementado."],
+      ["S6","Nenhum endpoint ou consulta para produto com maior volume de saída implementado."],
+      ["S6","Nenhum endpoint ou consulta para identificar produtos em nível mínimo/máximo. Modelo Produto sem campos limite_min e limite_max."]
+    ]
+  },
+  {
+    nome: "Pablo Guimarães Santos Sousa",
+    cpf: "000.000.026-26",
+    a: [
+      [4,"Script completo: 5 tabelas (categoria, produto, entrada_estoque, saida_estoque, auditoria) com PKs AUTO_INCREMENT e FKs nomeadas. 3+ registros. CHECKs de integridade."],
+      [4,"View vw_estoque com 7 colunas: id_produto, produto, categoria, unidade_medida, quantidade_atual, valor_unitario, valor_total = quantidade_atual * valor_unitario via JOIN."],
+      [4,"DER em docs/DER.md usando Mermaid erDiagram com 4 entidades, atributos com tipos, PKs/FKs marcados, cardinalidades (||--o{). Contém todos os 6 elementos obrigatórios."],
+      [4,"RelatorioService.valorTotalPorCategoria(): SELECT c.nome AS categoria, SUM(p.quantidade_atual * p.valor_unitario) AS valor_total FROM produto JOIN categoria GROUP BY c.id_categoria ORDER BY valor_total DESC."],
+      [3,"ProdutoController GET /produtos retorna lista com 4+ campos relevantes. Sem ordenação explícita por nome nem filtros adicionais. Nível 3."],
+      [4,"ProdutoService.cadastrar() valida: nome não nulo/em branco, categoria obrigatória (busca no banco), unidade_medida, valor_unitario >= 0, quantidade <= 100. Lança RegraNegocioException. Registra auditoria."],
+      [3,"EstoqueController GET /estoque/saidas chama saidaRepository.findAllByOrderByDataSaidaDesc(). Data em formato LocalDate ISO (yyyy-MM-dd), não dd-MM-yyyy."],
+      [3,"EstoqueService.registrarEntrada() valida quantidade > 0, verifica limite máximo de 100, atualiza saldo. Transacional. Data em formato LocalDate padrão ISO, não dd-MM-yyyy."],
+      [4,"RelatorioService.movimentacoesPorPeriodo() retorna 7 campos: nome_produto, unidade_medida, total_entradas, total_saidas, saldo_periodo, valor_total_financeiro_entradas, valor_total_financeiro_saidas."],
+      [4,"RelatorioService.produtosMaiorVolumeSaida() retorna 3 campos: nome_produto, quantidade_total_saida, valor_total_financeiro_saidas. Agrupado, ordenado DESC. Valida período."],
+      [4,"RelatorioService.produtosLimiteEstoque() retorna nome_produto, quantidade_atual, limite_atingido (CASE WHEN), percentual_nivel_atingido (%). Filtra WHERE quantidade <= 0 OR quantidade >= 100."]
+    ]
+  },
+  {
+    nome: "Rodrigo Gentili Habib",
+    cpf: "000.000.027-27",
+    a: [
+      [1,"Script usa sintaxe SQL Server (IDENTITY(1,1)) em vez de MySQL AUTO_INCREMENT. Tabelas têm PKs e FKs parciais mas a sintaxe incorreta causaria falha na execução MySQL. Sem INSERTs."],
+      ["S6","Nenhuma view vw_estoque foi criada no script banco.sql."],
+      [1,"Existe um arquivo .brM3 entre os arquivos submetidos. Não é legível como texto mas evidencia tentativa de criação de DER. Sem arquivo de imagem exportado legível."],
+      ["S6","Nenhum código Java foi submetido. Sem backend."],
+      ["S6","Sem código Java submetido."],
+      ["S6","Sem código Java submetido."],
+      ["S6","Sem código Java submetido."],
+      ["S6","Sem código Java submetido."],
+      ["S6","Sem código Java submetido."],
+      ["S6","Sem código Java submetido."],
+      ["S6","Sem código Java submetido."]
+    ]
+  },
+  {
+    nome: "Samara dos Santos Cerqueira",
+    cpf: "000.000.028-28",
+    a: [
+      [3,"Script MySQL com tabelas produto, entrada e saida, PKs AUTO_INCREMENT e FKs nomeadas. Sintaxe válida. Porém sem nenhum INSERT com dados de teste."],
+      ["S6","Nenhuma view vw_estoque foi criada no arquivo SQL."],
+      ["S6","Nenhum arquivo de DER encontrado entre os arquivos submetidos."],
+      [3,"ProdutoRepository.valorTotalPorCategoria(): SELECT p.categoria, SUM(p.quantidade * p.valorUnitario) FROM Produto GROUP BY p.categoria ORDER BY p.categoria. Retorna 2 campos."],
+      [3,"ProdutoRepository.listarProdutos(): SELECT p FROM Produto p ORDER BY p.nome. Retorna 4+ campos. Validação via @NotBlank/@NotNull no modelo."],
+      [3,"POST /produtos com @NotBlank/@NotNull/@Min/@Valid. GlobalExceptionHandler trata erros com 400. Sem verificação de duplicidade."],
+      [3,"SaidaRepository.listarSaidas(): SELECT s FROM Saida s ORDER BY s.dataSaida DESC. Retorna campos relevantes. Data em formato LocalDate ISO padrão, não dd-MM-yyyy."],
+      [2,"EntradaService.registrarEntrada() busca produto, soma quantidade ao estoque e salva entrada. Sem validação de quantidade > 0, sem verificação de limite máximo."],
+      [2,"SaidaRepository.movimentacaoSaidas() retorna 4 campos apenas de saídas, sem combinar entradas. EntradaService.buscarPorPeriodo() lança UnsupportedOperationException."],
+      [3,"SaidaRepository.produtosMaisVendidos(): produto.nome, SUM(quantidade), SUM(quantidade * valorUnitario). 3 campos corretos. Agrupado, ordenado por SUM(quantidade) DESC. Com parâmetros de período."],
+      [4,"ProdutoRepository.estoqueLimite(): p.nome, p.quantidade, CASE (MINIMO/MAXIMO), (p.quantidade * 100.0 / 100) como percentual. 4 campos incluindo percentual. Exposto em GET /produtos/estoque-limite."]
+    ]
+  },
+  {
+    nome: "Vener Gomes da Conceição Santos",
+    cpf: "000.000.029-29",
+    a: [
+      [4,"Script MySQL cria banco, tabelas produto (com estoque_minimo e estoque_maximo), movimentacao com FK nomeada, ON DELETE RESTRICT ON UPDATE CASCADE. Insere 3 produtos e 3 movimentações."],
+      [4,"View vw_estoque com 7 colunas: id, nome, categoria, unidade_medida, quantidade, valor_unitario, (quantidade * valor_unitario) AS valor_total."],
+      ["S6","Nenhum arquivo de DER encontrado nos arquivos submetidos (sem .brM3, .png, .pdf ou .md com diagrama)."],
+      [3,"EstoqueDAO.listarValorTotalPorCategoria(): SELECT categoria, SUM(quantidade * valor_unitario) FROM produto GROUP BY categoria ORDER BY categoria. 2 campos. Ordena por nome, não por valor."],
+      [4,"EstoqueDAO.listarProdutos(): SELECT id, nome, categoria, unidade_medida, quantidade, valor_unitario, estoque_minimo, estoque_maximo FROM produto ORDER BY nome. 8 campos. Com validações de entrada via helpers."],
+      [3,"SistemaEstoque.cadastrarProduto() valida todos os campos via helpers. Insere produto com todos os campos. Sem verificação de duplicidade de nome."],
+      [3,"EstoqueDAO.listarSaidasPorData(): SELECT p.nome, m.quantidade, m.valor_total, m.data_mov FROM movimentacao JOIN produto WHERE tipo='SAIDA' ORDER BY data_mov DESC. 4 campos. Data em formato yyyy-MM-dd."],
+      [3,"EstoqueDAO.registrarEntrada() usa transação (setAutoCommit(false)/commit/rollback), atualiza quantidade. Sem verificar limite máximo. Data em formato ISO padrão."],
+      [4,"EstoqueDAO.listarMovimentacoesPeriodo() retorna 7 campos: nome, unidade_medida, total_entradas, total_saidas, saldo_periodo, valor_total_entradas, valor_total_saidas. Usa COALESCE. Nível 4."],
+      [4,"EstoqueDAO.listarProdutosMaiorSaidaPeriodo(): nome, total_saida (SUM quantidade), valor_total_financeiro (SUM valor_total). Filtra WHERE tipo='SAIDA' e período. Ordena por total_saida DESC."],
+      [4,"EstoqueDAO.identificarLimitesEstoque(): nome, quantidade, estoque_minimo, estoque_maximo WHERE quantidade <= estoque_minimo OR quantidade >= estoque_maximo. Exibe status e percentual (quantidade * 100.0 / estoque_maximo)."]
+    ]
+  }
+];
+
+function inicializar() {
+  const lista = ALUNOS.map(a => ({ nome: a.nome, cpf: a.cpf }));
+  localStorage.setItem("saep_alunos", JSON.stringify(lista));
+
+  ALUNOS.forEach(aluno => {
+    const meta = {
+      avaliador: META.avaliador,
+      curso: META.curso,
+      data: META.data,
+      hora: META.hora,
+      edicao: META.edicao
+    };
+    localStorage.setItem("saep_respostas_" + aluno.cpf,   JSON.stringify({ ...meta, respostas: gerarRespostas01(aluno.a) }));
+    localStorage.setItem("saep02_respostas_" + aluno.cpf, JSON.stringify({ ...meta, respostas: gerarRespostas(aluno.a) }));
+  });
+
+  const div = document.getElementById("resultado");
+  div.innerHTML = `
+    <p class="ok">✓ ${ALUNOS.length} alunos carregados no localStorage com sucesso! (SAEP01 + SAEP02)</p>
+    <ul>${ALUNOS.map(a => `<li>${a.nome}</li>`).join("")}</ul>
+    <a class="btn" href="saep01/index.html">Abrir formulário SAEP01 →</a>
+    <a class="btn" href="saep02/index.html" style="margin-left:12px;">Abrir formulário SAEP02 →</a>
+  `;
+}
+</script>
+</body>
+</html>

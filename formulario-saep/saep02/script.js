@@ -472,7 +472,11 @@ btnLimpar.addEventListener("click", () => {
 });
 
 btnImprimir.addEventListener("click", () => {
+  const aluno = alunos.find(a => a.cpf === alunoSelect.value);
+  const tituloOriginal = document.title;
+  if (aluno) document.title = aluno.nome;
   window.print();
+  document.title = tituloOriginal;
 });
 
 // ---------------------------------------------------------------------------
